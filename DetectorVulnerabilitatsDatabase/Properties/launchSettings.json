@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "DetectorVulnerabilitatsDatabase": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}

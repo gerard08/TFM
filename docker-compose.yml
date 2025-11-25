@@ -1,0 +1,65 @@
+services:
+  vulnerabilityscanner.api:
+    image: ${DOCKER_REGISTRY-}vulnerabilityscannerapi
+    build:
+      context: .
+      dockerfile: DetectorVulnerabilitats/Dockerfile
+    ports:
+        - "8080:8080"
+    depends_on:
+      - rabbitmq
+      - db
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - RABBITMQ__HOST=rabbitmq
+
+  vulnerabilityscanner.worker:
+    image: ${DOCKER_REGISTRY-}vulnerabilityscannerworker
+    build:
+      context: .
+      dockerfile: Worker/Dockerfile
+    ports:
+        - "8081:8080"
+    depends_on:
+      - rabbitmq
+      - db
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - RABBITMQ__HOST=rabbitmq
+
+  vulnerabilityscanner.worker2:
+    image: ${DOCKER_REGISTRY-}vulnerabilityscannerworker
+    build:
+      context: .
+      dockerfile: Worker/Dockerfile
+    ports:
+        - "8082:8080"
+    depends_on:
+      - rabbitmq
+      - db
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - RABBITMQ__HOST=rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"      # Port AMQP
+      - "15672:15672"    # UI de gestió
+      
+  db:
+    image: postgres:15
+    container_name: db
+    restart: always
+    environment:
+      POSTGRES_DB: DetectorVulnerabilitats
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: secretpassword
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+
+volumes:
+  pgdata:
