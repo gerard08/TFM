@@ -11,7 +11,6 @@ namespace DetectorVulnerabilitatsDatabase.Context
         public DbSet<Findings> Findings { get; set; }
         public DbSet<ScanResults> ScanResults { get; set; }
         public DbSet<ScanTask> ScanTasks { get; set; }
-        public DbSet<Solutions> Solutions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -34,32 +33,21 @@ namespace DetectorVulnerabilitatsDatabase.Context
                 .HasForeignKey(scanResult => scanResult.Scan_result_id)
                 .OnDelete(DeleteBehavior.Cascade);
             });
-                
+
             modelBuilder.Entity<ScanTask>(entity =>
             {
                 entity.HasKey(u => u.Id);
 
                 entity.HasOne(task => task.Asset)
                 .WithMany(asset => asset.ScanTasks)
-                .HasForeignKey(task  => task.Asset_id)
+                .HasForeignKey(task => task.Asset_id)
                 .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasOne(task => task.ScanResults)
                 .WithOne(scanResult => scanResult.ScanTask)
                 .HasForeignKey<ScanResults>(scanResult => scanResult.Scan_task_id)
                 .OnDelete(DeleteBehavior.Cascade);
-            });
-                
-            modelBuilder.Entity<Solutions>(entity =>
-            {
-                entity.HasKey(u => u.Id);
-
-                entity.HasOne(solutions => solutions.Findings)
-                .WithOne(findings => findings.Solutions)
-                .HasForeignKey<Findings>(findings => findings.Solution_id)
-                .OnDelete(DeleteBehavior.Cascade);
-            });
-                
+            });                
         }
     }
 }

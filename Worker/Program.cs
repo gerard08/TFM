@@ -1,3 +1,6 @@
+using DetectorVulnerabilitatsDatabase.Context;
+using Microsoft.EntityFrameworkCore;
+using Worker.Operations;
 using Worker.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +13,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<IQueueService, QueueService>();
 builder.Services.AddHostedService<QueueWorker>();
+builder.Services.AddDbContext<DetectorVulnerabilitatsDatabaseContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<DbOperations>();
+builder.Services.AddHttpClient<LocalAiService>();
 
 var app = builder.Build();
 

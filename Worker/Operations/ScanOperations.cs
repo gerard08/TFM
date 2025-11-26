@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using DetectorVulnerabilitatsDatabase.Models;
+using System.Diagnostics;
 using System.Text;
 using Worker.Helpers;
 using Worker.Models;
@@ -7,7 +8,7 @@ namespace Worker.Operations
 {
     public static class ScanOperations
     {
-        public static async Task<string> RunScanAsync(ScanRequest request, CancellationToken cancellationToken)
+        public static async Task<List<Findings>> RunScanAsync(ScanRequest request, CancellationToken cancellationToken)
         {
             // Decideix quina eina fer servir segons el tipus
             var (command, arguments) = request.ScanType switch
@@ -24,7 +25,7 @@ namespace Worker.Operations
 
             return request.ScanType switch
             {
-                ScanType.Services => rawResult.ParseNmapXmlResult(),
+                ScanType.Services => await NmapParser.ParseToFindingsAsync(rawResult),
                 _ => throw new InvalidOperationException($"Tipus d'escaneig desconegut: {request.ScanType}")
             };
         }

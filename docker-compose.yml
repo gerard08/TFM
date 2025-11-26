@@ -9,6 +9,7 @@ services:
     depends_on:
       - rabbitmq
       - db
+      - ollama-puller 
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - RABBITMQ__HOST=rabbitmq
@@ -23,9 +24,11 @@ services:
     depends_on:
       - rabbitmq
       - db
+      - ollama-puller 
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - RABBITMQ__HOST=rabbitmq
+      - OllamaUrl=http://ollama-service:11434
 
   vulnerabilityscanner.worker2:
     image: ${DOCKER_REGISTRY-}vulnerabilityscannerworker
@@ -37,9 +40,11 @@ services:
     depends_on:
       - rabbitmq
       - db
+      - ollama-puller 
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - RABBITMQ__HOST=rabbitmq
+      - OllamaUrl=http://ollama-service:11434
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -61,5 +66,28 @@ services:
     ports:
       - 5432:5432
 
+  ollama-service:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434" # Opcional, per si vols provar-ho des del navegador del PC
+    volumes:
+      - ollama_data:/root/.ollama # Important: Persistència dels models baixats
+    restart: always
+
+  ollama-puller:
+    image: ollama/ollama:latest # Usem la mateixa imatge perquè ja té el client CLI
+    container_name: ollama-puller
+    depends_on:
+      - ollama-service
+    volumes:
+      - ollama_data:/root/.ollama # Compartim volum per no baixar-ho 2 cops
+    entrypoint: /bin/sh
+    # La comanda: espera que el servidor arrenqui i després fa el pull
+    command: "-c 'sleep 5; ollama pull llama3.2:3b'"
+    environment:
+      - OLLAMA_HOST=ollama-service:11434 # Li diem on és el servidor
+
 volumes:
   pgdata:
+  ollama_data:

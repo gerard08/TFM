@@ -1,110 +1,83 @@
-﻿using System.Text.Json;
+﻿using DetectorVulnerabilitatsDatabase.Models;
+using System.Globalization; // Necessari per parsejar decimals amb punts
 using System.Xml.Linq;
 
 namespace Worker.Helpers
 {
     public static class NmapParser
     {
-        public static string ParseNmapXmlResult(this string xmlOutput)
+        // Ara és ASYNC i retorna una LLISTA d'objectes
+        public static async Task<List<Findings>> ParseToFindingsAsync(string xmlOutput)
         {
-            // Carreguem l'XML (si l'output ve brut, potser cal netejar capçaleres abans)
-            var doc = XDocument.Parse(xmlOutput);
+            var findingsList = new List<Findings>();
 
-            // Busquem l'adreça IP
-            var hostInfo = doc.Descendants("address")
-                              .FirstOrDefault(x => x.Attribute("addrtype")?.Value == "ipv4");
+            // Validació bàsica per si l'output és buit
+            if (string.IsNullOrWhiteSpace(xmlOutput)) return findingsList;
 
-            var hostIp = hostInfo?.Attribute("addr")?.Value;
+            XDocument doc;
+            try
+            {
+                doc = XDocument.Parse(xmlOutput);
+            }
+            catch
+            {
+                // Si l'XML no és vàlid, retornem llista buida (o pots llançar excepció)
+                return findingsList;
+            }
 
-            // Busquem els ports
-            var portsList = new List<object>();
-
-            // Nmap estructura: host -> ports -> port
+            // Iterem sobre tots els ports trobats
             var ports = doc.Descendants("port");
 
             foreach (var port in ports)
             {
-                var service = port.Element("service");
-                var portId = int.Parse(port.Attribute("portid")?.Value ?? "0");
-                var protocol = port.Attribute("protocol")?.Value;
-                var state = port.Element("state")?.Attribute("state")?.Value;
+                // 1. Informació del servei (Affected Service)
+                var serviceElem = port.Element("service");
+                var product = serviceElem?.Attribute("product")?.Value ?? "Unknown Service";
+                var version = serviceElem?.Attribute("version")?.Value ?? "";
+                var fullServiceName = $"{product} {version}".Trim();
 
-                // Informació del servei
-                var serviceName = service?.Attribute("name")?.Value ?? "unknown";
-                var product = service?.Attribute("product")?.Value;
-                var version = service?.Attribute("version")?.Value;
-                var fullVersion = $"{product} {version}".Trim();
-
-                // ---------------------------------------------------------
-                // AQUÍ ÉS ON EXTREIEM LES VULNERABILITATS (Script 'vulners')
-                // ---------------------------------------------------------
-                var vulns = new List<object>();
-
-                // Busquem l'element <script> que tingui id="vulners"
+                // 2. Busquem l'script de vulners
                 var vulnersScript = port.Elements("script")
                                         .FirstOrDefault(s => s.Attribute("id")?.Value == "vulners");
 
-                if (vulnersScript != null)
+                if (vulnersScript == null) continue;
+
+                // 3. Iterem sobre les taules de vulnerabilitats
+                foreach (var table in vulnersScript.Descendants("table"))
                 {
-                    // L'estructura de vulners dins l'XML sol ser taules 'table'
-                    foreach (var table in vulnersScript.Descendants("table"))
+                    var id = GetElemValue(table, "id");
+
+                    // --- FILTRE CRÍTIC: Només volem CVEs ---
+                    if (string.IsNullOrEmpty(id) || !id.StartsWith("CVE-"))
                     {
-                        // Busquem els elements clau dins de cada entrada de vulnerabilitat
-                        var id = GetElemValue(table, "id");
-                        var cvss = GetElemValue(table, "cvss");
-                        var type = GetElemValue(table, "type"); // ex: cve
-
-                        // Només afegim si tenim un ID vàlid (ex: CVE-2021-...)
-                        if (!string.IsNullOrEmpty(id))
-                        {
-                            // AFEGIT: Obtenim la descripció real (això fa el procés més lent!)
-                            // Nota: Com que ParseNmapXmlResult segurament no és async, 
-                            // forcem l'espera amb .Result (compte amb els bloquejos en UI, en un Worker està bé)
-
-                            string realSummary = "Loading...";
-
-                            if (string.IsNullOrEmpty(id) || !id.StartsWith("CVE-"))
-                            {
-                                continue;
-                            }
-
-                            realSummary = CveHelper.GetCveDescriptionAsync(id).Result;
-                            vulns.Add(new
-                            {
-                                id = id,
-                                cvss = cvss,
-                                type = type,
-                                summary = realSummary, // <--- Aquí tens la descripció completa del NIST
-                                link = $"https://vulners.com/{type}/{id}"
-                            });
-                        }
+                        continue;
                     }
-                }
 
-                portsList.Add(new
-                {
-                    port = portId,
-                    protocol = protocol,
-                    state = state,
-                    service = serviceName,
-                    version = fullVersion,
-                    vulnerabilities = vulns.Count > 0 ? vulns : null // Només mostrem si n'hi ha
-                });
+                    // --- Extracció de dades ---
+                    var severity = GetElemValue(table, "cvss");
+
+                    // --- Obtenir descripció real (NIST API) ---
+                    // Nota: Aquí fem servir await, per això el mètode és async
+                    var realDescription = await CveHelper.GetCveDescriptionAsync(id);
+
+                    // 4. Creació de l'objecte Findings
+                    findingsList.Add(new Findings()
+                    {
+                        Title = $"{fullServiceName} - {id}", // Ex: Apache httpd 2.4.7 - CVE-2021-41773
+                        Severity = severity!,
+                        Cve_id = id,
+                        Affected_service = fullServiceName,
+                        Description = realDescription,
+                        Created_at = DateTime.UtcNow
+                    });
+                }
             }
 
-            var result = new
-            {
-                host = hostIp,
-                ports = portsList
-            };
-
-            return JsonSerializer.Serialize(result, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            // Opcional: Ordenar per severitat (més greus primer)
+            return findingsList.OrderByDescending(f => f.Severity).ToList();
         }
 
-        // Helper per treure valors de les taules estranyes de Nmap XML
+        // Helper per treure valors de les taules de Nmap
         private static string? GetElemValue(XElement table, string key)
         {
             return table.Elements("elem")
