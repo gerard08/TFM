@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using Worker.Helpers;
 using Worker.Models;
@@ -13,7 +12,11 @@ namespace Worker.Operations
             // Decideix quina eina fer servir segons el tipus
             var (command, arguments) = request.ScanType switch
             {
-                "services" => ("nmap", $"-sV {request.Target}"),
+                ScanType.Services => ("nmap", $"-sV --script vulners -oX - {request.Target}"),
+                ScanType.WebEnumeration => throw new NotImplementedException(),
+                ScanType.WebVuln => throw new NotImplementedException(),
+                ScanType.CmsScan => throw new NotImplementedException(),
+                ScanType.VulnDb => throw new NotImplementedException(),
                 _ => throw new InvalidOperationException($"Tipus d'escaneig desconegut: {request.ScanType}")
             };
 
@@ -21,7 +24,7 @@ namespace Worker.Operations
 
             return request.ScanType switch
             {
-                "services" => rawResult.ParseNmapServiceDiscoveryResult(),
+                ScanType.Services => rawResult.ParseNmapXmlResult(),
                 _ => throw new InvalidOperationException($"Tipus d'escaneig desconegut: {request.ScanType}")
             };
         }

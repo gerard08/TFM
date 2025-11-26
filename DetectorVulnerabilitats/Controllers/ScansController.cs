@@ -21,7 +21,7 @@ namespace DetectorVulnerabilitats.Controllers
         [HttpGet("try")]
         public string StartScan()
         {
-            return "HttpStatusCode";
+            return "okay";
         }
 
         [HttpPost("requestscan")]

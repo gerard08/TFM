@@ -1,16 +1,101 @@
 ﻿using System.Text.Json;
-using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace Worker.Helpers
 {
     public static class NmapParser
     {
-        public static string ParseNmapServiceDiscoveryResult(this string output)
+        public static string ParseNmapXmlResult(this string xmlOutput)
         {
+            // Carreguem l'XML (si l'output ve brut, potser cal netejar capçaleres abans)
+            var doc = XDocument.Parse(xmlOutput);
+
+            // Busquem l'adreça IP
+            var hostInfo = doc.Descendants("address")
+                              .FirstOrDefault(x => x.Attribute("addrtype")?.Value == "ipv4");
+
+            var hostIp = hostInfo?.Attribute("addr")?.Value;
+
+            // Busquem els ports
+            var portsList = new List<object>();
+
+            // Nmap estructura: host -> ports -> port
+            var ports = doc.Descendants("port");
+
+            foreach (var port in ports)
+            {
+                var service = port.Element("service");
+                var portId = int.Parse(port.Attribute("portid")?.Value ?? "0");
+                var protocol = port.Attribute("protocol")?.Value;
+                var state = port.Element("state")?.Attribute("state")?.Value;
+
+                // Informació del servei
+                var serviceName = service?.Attribute("name")?.Value ?? "unknown";
+                var product = service?.Attribute("product")?.Value;
+                var version = service?.Attribute("version")?.Value;
+                var fullVersion = $"{product} {version}".Trim();
+
+                // ---------------------------------------------------------
+                // AQUÍ ÉS ON EXTREIEM LES VULNERABILITATS (Script 'vulners')
+                // ---------------------------------------------------------
+                var vulns = new List<object>();
+
+                // Busquem l'element <script> que tingui id="vulners"
+                var vulnersScript = port.Elements("script")
+                                        .FirstOrDefault(s => s.Attribute("id")?.Value == "vulners");
+
+                if (vulnersScript != null)
+                {
+                    // L'estructura de vulners dins l'XML sol ser taules 'table'
+                    foreach (var table in vulnersScript.Descendants("table"))
+                    {
+                        // Busquem els elements clau dins de cada entrada de vulnerabilitat
+                        var id = GetElemValue(table, "id");
+                        var cvss = GetElemValue(table, "cvss");
+                        var type = GetElemValue(table, "type"); // ex: cve
+
+                        // Només afegim si tenim un ID vàlid (ex: CVE-2021-...)
+                        if (!string.IsNullOrEmpty(id))
+                        {
+                            // AFEGIT: Obtenim la descripció real (això fa el procés més lent!)
+                            // Nota: Com que ParseNmapXmlResult segurament no és async, 
+                            // forcem l'espera amb .Result (compte amb els bloquejos en UI, en un Worker està bé)
+
+                            string realSummary = "Loading...";
+
+                            if (string.IsNullOrEmpty(id) || !id.StartsWith("CVE-"))
+                            {
+                                continue;
+                            }
+
+                            realSummary = CveHelper.GetCveDescriptionAsync(id).Result;
+                            vulns.Add(new
+                            {
+                                id = id,
+                                cvss = cvss,
+                                type = type,
+                                summary = realSummary, // <--- Aquí tens la descripció completa del NIST
+                                link = $"https://vulners.com/{type}/{id}"
+                            });
+                        }
+                    }
+                }
+
+                portsList.Add(new
+                {
+                    port = portId,
+                    protocol = protocol,
+                    state = state,
+                    service = serviceName,
+                    version = fullVersion,
+                    vulnerabilities = vulns.Count > 0 ? vulns : null // Només mostrem si n'hi ha
+                });
+            }
+
             var result = new
             {
-                host = ParseHosts(output),
-                ports = ParsePorts(output)
+                host = hostIp,
+                ports = portsList
             };
 
             return JsonSerializer.Serialize(result, new JsonSerializerOptions
@@ -19,35 +104,12 @@ namespace Worker.Helpers
             });
         }
 
-        private static string ParseHosts(string output)
+        // Helper per treure valors de les taules estranyes de Nmap XML
+        private static string? GetElemValue(XElement table, string key)
         {
-            var match = Regex.Match(output, @"Nmap scan report for ([\d\.]+)");
-            return match.Success ? match.Groups[1].Value : null;
-        }
-
-        private static List<object> ParsePorts(string output)
-        {
-            var ports = new List<object>();
-            // Captura línies com: 22/tcp   open  ssh        OpenSSH 9.2p1 Debian 2+deb12u7 (protocol 2.0)
-            var regex = new Regex(@"(\d+)\/(\w+)\s+(\w+)\s+(\S+)\s+(.*)");
-
-            foreach (var line in output.Split('\n'))
-            {
-                var match = regex.Match(line);
-                if (match.Success)
-                {
-                    ports.Add(new
-                    {
-                        port = int.Parse(match.Groups[1].Value),
-                        protocol = match.Groups[2].Value,
-                        state = match.Groups[3].Value,
-                        service = match.Groups[4].Value,
-                        version = match.Groups[5].Value.Trim()
-                    });
-                }
-            }
-
-            return ports;
+            return table.Elements("elem")
+                        .FirstOrDefault(e => e.Attribute("key")?.Value == key)
+                        ?.Value;
         }
     }
 }
