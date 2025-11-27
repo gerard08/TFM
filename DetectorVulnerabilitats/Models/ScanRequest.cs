@@ -18,7 +18,7 @@ namespace DetectorVulnerabilitats.Models
         public DateTime CreationTime { get; set; } = DateTime.UtcNow;
     }
 
-    public enum ScanTypeEnum
+     public enum ScanTypeEnum
     {
         Services = 0,
         WebEnumeration = 1,

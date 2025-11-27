@@ -76,11 +76,19 @@ public class QueueService: IQueueService
                     //        Created_at = DateTime.UtcNow
                     //    } 
                     //};
+                    var options = new ParallelOptions { MaxDegreeOfParallelism = 5 }; // Ajusta segons la RAM/CPU del teu servidor Ollama
 
-                    foreach (var finding in findings)
+                    await Parallel.ForEachAsync(findings, options, async (finding, token) =>
                     {
+                        // Important: Crear un scope per fil si FindSolutionWithAi usa serveis Scoped
+                        // Com que la teva funció 'FindSolutionWithAi' ja crea el seu propi scope, pots cridar-la directament
                         finding.Solution = await FindSolutionWithAi(finding);
-                    }
+                    });
+                     
+                    //foreach (var finding in findings)
+                    //{
+                    //    finding.Solution = await FindSolutionWithAi(finding);
+                    //}
 
                     await SaveResultsToDb(scanRequest, scanTaskGuid, findings);
                 }
