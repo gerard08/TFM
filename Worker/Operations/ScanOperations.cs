@@ -13,11 +13,11 @@ namespace Worker.Operations
             // Decideix quina eina fer servir segons el tipus
             var (command, arguments) = request.ScanType switch
             {
-                ScanType.Services => ("nmap", $"-sV --script vulners -oX - {request.Target}"),
-                ScanType.WebEnumeration => throw new NotImplementedException(),
-                ScanType.WebVuln => throw new NotImplementedException(),
-                ScanType.CmsScan => throw new NotImplementedException(),
-                ScanType.VulnDb => throw new NotImplementedException(),
+                ScanTypeEnum.Services => ("nmap", $"-sV --script vulners -oX - {request.Target}"),
+                ScanTypeEnum.WebEnumeration => throw new NotImplementedException(),
+                ScanTypeEnum.WebVuln => throw new NotImplementedException(),
+                ScanTypeEnum.CmsScan => throw new NotImplementedException(),
+                ScanTypeEnum.VulnDb => throw new NotImplementedException(),
                 _ => throw new InvalidOperationException($"Tipus d'escaneig desconegut: {request.ScanType}")
             };
 
@@ -25,7 +25,7 @@ namespace Worker.Operations
 
             return request.ScanType switch
             {
-                ScanType.Services => await NmapParser.ParseToFindingsAsync(rawResult),
+                ScanTypeEnum.Services => await NmapParser.ParseToFindingsAsync(rawResult),
                 _ => throw new InvalidOperationException($"Tipus d'escaneig desconegut: {request.ScanType}")
             };
         }

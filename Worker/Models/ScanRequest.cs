@@ -12,11 +12,13 @@ namespace Worker.Models
         /// <summary>
         /// Type of the Scan that the user wants to perform
         /// </summary>
-        [EnumDataType(typeof(ScanType))] // Assegura que és un valor vàlid de l'enum
-        public ScanType ScanType { get; set; } = 0;
+        [EnumDataType(typeof(ScanTypeEnum))] // Assegura que és un valor vàlid de l'enum
+        public ScanTypeEnum ScanType { get; set; } = 0;
+
+        public DateTime CreationTime { get; set; } = DateTime.UtcNow;
     }
 
-    public enum ScanType
+    public enum ScanTypeEnum
     {
         Services = 0,
         WebEnumeration = 1,
