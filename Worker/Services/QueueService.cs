@@ -3,11 +3,8 @@ using DetectorVulnerabilitatsDatabase.Models;
 using Microsoft.EntityFrameworkCore;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
-using Worker.Helpers;
 using Worker.Models;
 using Worker.Operations;
 using Worker.Services;
@@ -66,29 +63,20 @@ public class QueueService: IQueueService
                 {
                     // Scan
                     var findings = await ScanOperations.RunScanAsync(scanRequest, cancellationToken);
-                    //var findings = new List<Findings> { 
-                    //    new(){
-                    //        Title = "CVE-2024-24747",
-                    //        Severity = "8.8",
-                    //        Cve_id = "CVE-2024-24747",
-                    //        Affected_service = "MinIO ",
-                    //        Description = "MinIO is a High Performance Object Storage. When someone creates an access key, it inherits the permissions of the parent key. Not only for `s3:*` actions, but also `admin:*` actions. Which means unless somewhere above in the access-key hierarchy, the `admin` rights are denied, access keys will be able to simply override their own `s3` permissions to something more permissive. The vulnerability is fixed in RELEASE.2024-01-31T20-20-33Z.",
-                    //        Created_at = DateTime.UtcNow
-                    //    } 
-                    //};
+                    
                     var options = new ParallelOptions { MaxDegreeOfParallelism = 5 }; // Ajusta segons la RAM/CPU del teu servidor Ollama
 
+                    var descriptionByAi = scanRequest.ScanType > ScanTypeEnum.Services; 
                     await Parallel.ForEachAsync(findings, options, async (finding, token) =>
                     {
                         // Important: Crear un scope per fil si FindSolutionWithAi usa serveis Scoped
                         // Com que la teva funció 'FindSolutionWithAi' ja crea el seu propi scope, pots cridar-la directament
                         finding.Solution = await FindSolutionWithAi(finding);
+                        if (descriptionByAi && finding.Description != string.Empty)
+                        {
+                            finding.Description = await WriteDescriptionWithAi(finding);
+                        }
                     });
-                     
-                    //foreach (var finding in findings)
-                    //{
-                    //    finding.Solution = await FindSolutionWithAi(finding);
-                    //}
 
                     await SaveResultsToDb(scanRequest, scanTaskGuid, findings);
                 }
@@ -155,7 +143,7 @@ public class QueueService: IQueueService
                 var taskStub = new ScanTask { Id = scanTaskGuid };
                 context.ScanTasks.Attach(taskStub);
 
-                taskStub.Status = "finished";
+                taskStub.Status = "completed";
                 taskStub.Finished_at = DateTime.UtcNow;
 
                 // Look for solutions
@@ -163,7 +151,7 @@ public class QueueService: IQueueService
                 {
                     Id = Guid.NewGuid(),
                     Scan_task_id = scanTaskGuid,
-                    Summary = "not implemented yet",
+                    Summary = $"Scanned {scanRequest.ScanType} on IP {scanRequest.Target} and found {findings.Count} findings.",
                     Created_at = DateTime.UtcNow,
                     Findings = findings
                 };
@@ -187,6 +175,15 @@ public class QueueService: IQueueService
             taskStub.Finished_at = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
+        }
+    }
+
+    private async Task<string> WriteDescriptionWithAi(Findings finding)
+    {
+        using (var scope = _scopeFactory.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<LocalAiService>();
+            return await context.GenerateDescriptionAsync(finding.Description);
         }
     }
 

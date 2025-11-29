@@ -10,6 +10,16 @@ EXPOSE 8081
 USER root
 RUN apt-get update && apt-get install -y nmap && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get update && apt-get install -y wget unzip
+RUN wget https://github.com/projectdiscovery/nuclei/releases/download/v3.1.0/nuclei_3.1.0_linux_amd64.zip
+RUN unzip nuclei_3.1.0_linux_amd64.zip
+RUN mv nuclei /usr/local/bin/
+RUN rm nuclei_3.1.0_linux_amd64.zip
+RUN chmod +x /usr/local/bin/nuclei
+
+# Descarreguem les plantilles de vulnerabilitats (això es fa al build time o al run time)
+RUN nuclei -update-templates
+
 # Esta fase se usa para compilar el proyecto de servicio
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release

@@ -19,6 +19,26 @@ namespace Worker.Services
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
         }
 
+        public async Task<string> GenerateDescriptionAsync(string description)
+        {
+            // PROMPT HÍBRID:
+            // Li demanem que busqui la versió, i si no, que dedueixi una solució genèrica.
+            var promptText = $@"
+                Role: Security Engineer.
+                Task: Provide a 1-sentence description for the following vulnerability found using nuclei.
+                
+                DETECTION OUTPUT:
+                {description}
+                
+                RULES:
+                1. If the text mentions a fixed version (e.g., 'fixed in 1.2.3'), reply: 'Update [PROGRAM] to version [VERSION] or later.'
+                2. If NO version is mentioned, use your knowledge to deduce the standard fix
+                3. Keep it under 20 words. No filler words. Be imperative.
+            ";
+
+            return await SendRequestToAi(promptText);
+        }
+
         public async Task<string> GenerateFixAsync(string cveId, string description, string software)
         {
             // PROMPT HÍBRID:
@@ -38,6 +58,11 @@ namespace Worker.Services
                 3. Keep it under 20 words. No filler words. Be imperative.
             ";
 
+            return await SendRequestToAi(promptText);
+        }
+
+        private async Task<string> SendRequestToAi(string promptText)
+        {
             var payload = new
             {
                 model = ModelName,

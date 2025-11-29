@@ -120,5 +120,98 @@ namespace Worker.Helpers
                         .FirstOrDefault(e => e.Attribute("key")?.Value == key)
                         ?.Value;
         }
+
+        public static List<Findings> ParseDatabaseFindings(string xmlOutput)
+        {
+            var findings = new List<Findings>();
+            if (string.IsNullOrWhiteSpace(xmlOutput)) return findings;
+
+            try
+            {
+                int xmlStartIndex = xmlOutput.IndexOf("<nmaprun");
+                if (xmlStartIndex == -1) return findings;
+                var doc = XDocument.Parse(xmlOutput.Substring(xmlStartIndex));
+
+                var ports = doc.Descendants("port");
+
+                foreach (var port in ports)
+                {
+                    var portId = port.Attribute("portid")?.Value;
+                    var serviceName = port.Element("service")?.Attribute("product")?.Value
+                                      ?? port.Element("service")?.Attribute("name")?.Value
+                                      ?? "Database";
+
+                    foreach (var script in port.Elements("script"))
+                    {
+                        var scriptId = script.Attribute("id")?.Value ?? "";
+                        var output = script.Attribute("output")?.Value ?? "";
+
+                        if (string.IsNullOrWhiteSpace(output)) continue;
+
+                        // --- LÒGICA DE DETECCIÓ ---
+
+                        // 1. Redis Obert (redis-info)
+                        if (scriptId == "redis-info" && output.Contains("authentication_required:0")) // O text similar
+                        {
+                            // A vegades nmap diu "authentication: required" o no. 
+                            // Una pista millor és si veiem dades internes com "redis_version" sense error.
+                            if (output.Contains("redis_version"))
+                            {
+                                findings.Add(CreateDbFinding("Redis Unauthenticated", "High", serviceName, portId, output));
+                            }
+                        }
+
+                        // 2. MySQL/Postgres/MSSQL Empty Password
+                        if (scriptId.Contains("empty-password") || scriptId.Contains("no-auth"))
+                        {
+                            if (output.Contains("success") || output.Contains("root") || output.Contains("sa") || output.Contains("admin"))
+                            {
+                                findings.Add(CreateDbFinding("CRITICAL: Database Empty Password", "Critical", serviceName, portId, output));
+                            }
+                        }
+
+                        // 3. Vulnerabilitats CVE (mysql-vuln-*)
+                        if (scriptId.Contains("vuln") && (output.Contains("VULNERABLE") || output.Contains("State: VULNERABLE")))
+                        {
+                            findings.Add(CreateDbFinding($"Vulnerable Database Component ({scriptId})", "High", serviceName, portId, output));
+                        }
+
+                        // 4. MongoDB Info (sense auth)
+                        if (scriptId == "mongodb-info" && !output.Contains("authentication failed"))
+                        {
+                            findings.Add(CreateDbFinding("MongoDB Information Exposure", "Medium", serviceName, portId, output));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error parsejant DB XML: {ex.Message}");
+            }
+
+            return findings;
+        }
+
+        // Helper intern per no repetir codi
+        private static Findings CreateDbFinding(string title, string severity, string service, string port, string details)
+        {
+            return new Findings
+            {
+                Title = title,
+                Severity = MapSeverity(severity), // Assegura't de tenir un mapeig a string "10.0", "7.0", etc.
+                Cve_id = "Misconfiguration",
+                Affected_service = $"{service} (Port {port})",
+                Description = $"Nmap Script Result:\n{details}",
+                Created_at = DateTime.UtcNow
+            };
+        }
+
+        private static string MapSeverity(string level) => level switch
+        {
+            "Critical" => "10.0",
+            "High" => "8.0",
+            "Medium" => "5.0",
+            _ => "1.0"
+        };
     }
 }

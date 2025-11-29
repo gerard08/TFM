@@ -24,6 +24,6 @@ namespace Worker.Models
         WebEnumeration = 1,
         WebVuln = 2,
         CmsScan = 3,
-        VulnDb = 4
+        DDBB = 4
     }
 }
