@@ -1,0 +1,11 @@
+/* You can add global styles to this file, and also import other style files */
+/* Afegeix aquestes tres línies al principi del teu fitxer CSS global */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ... altres estils globals si en tens ... */
+html, body {
+    height: 100%;
+    margin: 0;
+}

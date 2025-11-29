@@ -1,4 +1,14 @@
 services:
+  vulnerabilityscanner.ui:
+    image: ${DOCKER_REGISTRY-}vulnerabilityscannerapiui
+    build:
+      context: ./DetectorVulnerabilitatsUI/DetectorVulnerabilitatsUI # Context dins la carpeta
+      dockerfile: Dockerfile
+    ports:
+      - "8000:80"
+    depends_on:
+      - vulnerabilityscanner.api
+
   vulnerabilityscanner.api:
     image: ${DOCKER_REGISTRY-}vulnerabilityscannerapi
     build:

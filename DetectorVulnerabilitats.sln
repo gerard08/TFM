@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.0.11222.15 d18.0
+VisualStudioVersion = 18.0.11222.15
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DetectorVulnerabilitats", "DetectorVulnerabilitats\DetectorVulnerabilitats.csproj", "{7DD9B31F-8A5A-41C0-BA62-3CE7BC764E96}"
 EndProject
@@ -10,6 +10,8 @@ EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{81DDED9D-158B-E303-5F62-77A2896D2A5A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DetectorVulnerabilitatsDatabase", "DetectorVulnerabilitatsDatabase\DetectorVulnerabilitatsDatabase.csproj", "{AB87A257-BD4E-4344-809F-555808F430B9}"
+EndProject
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "DetectorVulnerabilitatsUI", "DetectorVulnerabilitatsUI\DetectorVulnerabilitatsUI\DetectorVulnerabilitatsUI.esproj", "{4C7F53F4-E902-BD33-A3BB-E9A7EF6F7094}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,12 @@ Global
 		{AB87A257-BD4E-4344-809F-555808F430B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AB87A257-BD4E-4344-809F-555808F430B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AB87A257-BD4E-4344-809F-555808F430B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C7F53F4-E902-BD33-A3BB-E9A7EF6F7094}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C7F53F4-E902-BD33-A3BB-E9A7EF6F7094}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C7F53F4-E902-BD33-A3BB-E9A7EF6F7094}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{4C7F53F4-E902-BD33-A3BB-E9A7EF6F7094}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C7F53F4-E902-BD33-A3BB-E9A7EF6F7094}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C7F53F4-E902-BD33-A3BB-E9A7EF6F7094}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
