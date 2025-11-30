@@ -5,6 +5,8 @@ using System.Text.Json;
 
 public class QueueService: IQueueService
 {
+    private const string QUEUE_SCAN_REQUEST_NAME = "scan-request";
+
     private readonly string _host;
     private IConnection _connection;
     private IChannel _channel;
@@ -25,7 +27,7 @@ public class QueueService: IQueueService
         };
         _connection = await factory.CreateConnectionAsync();
         _channel = await _connection.CreateChannelAsync();
-        await _channel.QueueDeclareAsync(queue: "scans", durable: true, exclusive: false, autoDelete: false, arguments: null);
+        await _channel.QueueDeclareAsync(queue: QUEUE_SCAN_REQUEST_NAME, durable: true, exclusive: false, autoDelete: false, arguments: null);
     }
 
     public async Task EnqueueScanAsync(ScanRequest request)
@@ -36,6 +38,6 @@ public class QueueService: IQueueService
         }
 
         var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request));
-        await _channel.BasicPublishAsync(exchange: string.Empty, routingKey: "scans", body: body);
+        await _channel.BasicPublishAsync(exchange: string.Empty, routingKey: QUEUE_SCAN_REQUEST_NAME, body: body);
     }
 }

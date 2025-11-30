@@ -1,13 +1,29 @@
-import { Component, model } from '@angular/core';
-
+import { Component, model, OnDestroy, OnInit } from '@angular/core';
+import { ScanService } from '../../services/scan-service/scan.service';
+import { Subscription } from 'rxjs';
+import { ScanCompletedEvent, SignalrService } from '../../services/signalr.service';
+import {ToastrService} from "ngx-toastr"
 @Component({
   selector: 'app-results',
   standalone: false,
   templateUrl: './results.html',
   styleUrl: './results.css',
 })
-export class Results {
+export class Results implements OnDestroy {
+
+  private signalRSubscription!: Subscription;
   scanHistory = model.required<any[]>();
+
+  constructor(
+  )
+  {}
+
+  ngOnDestroy() {
+    // Molt important: Desubscriure's per evitar memory leaks
+    if (this.signalRSubscription) {
+      this.signalRSubscription.unsubscribe();
+    }
+  }
 
     getHistoryStatusClass(status: string): string {
     if (status === 'Net') {

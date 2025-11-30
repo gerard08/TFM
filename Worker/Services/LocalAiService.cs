@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using DetectorVulnerabilitatsDatabase.Models;
+using System.Text;
 using System.Text.Json;
 
 namespace Worker.Services
@@ -7,16 +8,18 @@ namespace Worker.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<LocalAiService> _logger;
+        private readonly IServiceScopeFactory _scopeFactory;
 
         // Canviem al model Llama 3.2
         private const string ModelName = "llama3.2:3b";
 
-        public LocalAiService(HttpClient httpClient, ILogger<LocalAiService> logger)
+        public LocalAiService(HttpClient httpClient, ILogger<LocalAiService> logger, IServiceScopeFactory scopeFactory)
         {
             _httpClient = httpClient;
             _logger = logger;
             // Augmentem el timeout per si la màquina va lenta
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            _scopeFactory = scopeFactory;
         }
 
         public async Task<string> GenerateDescriptionAsync(string description)
@@ -102,6 +105,24 @@ namespace Worker.Services
             {
                 _logger.LogError(ex, "Failed to connect to Local AI (Ollama).");
                 return "Check official vendor advisories.";
+            }
+        }
+
+        public async Task<string> WriteDescriptionWithAi(Findings finding)
+        {
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<LocalAiService>();
+                return await context.GenerateDescriptionAsync(finding.Description);
+            }
+        }
+
+        public async Task<string> FindSolutionWithAi(Findings finding)
+        {
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<LocalAiService>();
+                return await context.GenerateFixAsync(finding.Cve_id, finding.Description, finding.Affected_service);
             }
         }
     }

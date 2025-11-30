@@ -27,6 +27,8 @@ namespace DetectorVulnerabilitats.Controllers
         [HttpPost("requestscan")]
         public async Task<IActionResult> StartScanAsync([FromBody] ScanRequest request)
         {
+            Console.WriteLine($"SCAN REQUESTED WITH TARGET {request.Target} AND SCAN TYPE {request.ScanType}");
+            _logger.LogInformation($"SCAN REQUESTED WITH TARGET {request.Target} AND SCAN TYPE {request.ScanType}");
             await _queue.EnqueueScanAsync(request);
             return Ok(new { status = "queued", target = request.Target });
         }

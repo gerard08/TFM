@@ -1,5 +1,10 @@
+import { ScanRequest } from './../../models/scanrequest';
 import { Component, model, signal } from '@angular/core';
 import { SCAN_TYPES } from '../../models/scan-types';
+import { FUNNY_MESSAGES } from '../../models/missatgesDivertits';
+import { ScanService } from '../../services/scan-service/scan.service';
+import { scan } from 'rxjs';
+import { tipusEscaneig } from '../../models/tipusEscaneig';
 
 @Component({
   selector: 'app-scan',
@@ -10,11 +15,12 @@ import { SCAN_TYPES } from '../../models/scan-types';
 export class Scan {
   scanTypes = SCAN_TYPES;
 
-
   activeTab = model.required<'dashboard' | 'scan' | 'results' | 'settings'>();
   scanHistory = model.required<any[]>();
   scanLogs = model.required<any[]>();
   logs = model.required<any[]>();
+  funnyMessages = FUNNY_MESSAGES;
+  currentFunnyMessage = signal<string>(this.funnyMessages[0]);
 
   stats = model.required<{
     scansTotal: number;
@@ -25,16 +31,26 @@ export class Scan {
   }>();
 
   targetUrl = signal<string>('');
-  selectedScanType = signal<string>('Services');
+  // selectedScanType = signal<string>('Services');
+  selectedScan = signal<tipusEscaneig>(SCAN_TYPES[0]);
   isScanning = signal<boolean>(false);
   scanProgress = signal<number>(0);
   elapsedTime = signal<string>('00:00');
 
   private scanInterval: any;
   private startTime: number = 0;
+  private messageInterval: any;
 
-  getScanTypeClass(typeId: string) {
-    return this.selectedScanType() === typeId
+  private scanService:ScanService;
+
+
+  constructor()
+  {
+    this.scanService = new ScanService();
+  }
+
+  getScanTypeClass(typeId: number) {
+    return this.selectedScan().id === typeId
       ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 ring-1 ring-emerald-500/50'
       : 'bg-slate-950 border-slate-700 text-slate-400 hover:border-slate-600 hover:bg-slate-800';
   }
@@ -43,62 +59,39 @@ export class Scan {
     this.targetUrl.set(event.target.value);
   }
 
-  selectScanType(typeId: string) {
-    this.selectedScanType.set(typeId);
+  selectScanType(typeId: number) {
+    this.selectedScan.set(SCAN_TYPES[typeId]);
   }
 
   startScan() {
     if (!this.targetUrl()) return;
 
     this.isScanning.set(true);
-    this.scanLogs.set([]);
-    this.elapsedTime.set('00:00');
 
-    this.startTime = Date.now();
+    // 2. Afegir "Pendent" a l'historial immediatament
 
-    this.scanLogs.update((l) => [
-      ...l,
-      { msg: `Connexió establerta amb motor .NET...`, type: 'info' },
-    ]);
-    this.scanLogs.update((l) => [
-      ...l,
-      { msg: `Enviant paquet d'inici per: ${this.targetUrl()}`, type: 'info' },
-    ]);
+    var scan = {
+      Target: this.targetUrl(),
+      ScanType: this.selectedScan().id
+    } as ScanRequest;
 
-    // Timer Interval (Real-time clock + Keep-alive messages)
-    this.scanInterval = setInterval(() => {
-      const now = Date.now();
-      const diff = now - this.startTime;
+console.log(scan);
 
-      // Update Timer Text
-      const minutes = Math.floor(diff / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
-      this.elapsedTime.set(
-        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-      );
-
-      // Simulació de finalització automàtica (p.ex. al cap de 10 segons per demo)
-      // En una app real, això passaria quan reps el callback del backend
-      // Aquí ho faig ràpid per provar la persistència
-      if (diff > 10000) {
-        this.completeScanSimulation(diff);
+    this.scanService.startScan(scan).subscribe({
+      next: (response) => {
+        console.log('Èxit! Resposta del servidor:', response);
+      },
+      error: (error) => {
+        console.error('Error enviant scan:', error);
       }
+    });
+    // Iniciar rotació de missatges graciosos
+    this.startFunnyMessages();
 
-      // Heartbeats
-      if (Math.floor(diff / 1000) % 3 === 0 && Math.floor(diff / 1000) > 0) {
-        const heartbeats = [
-          'Processant paquets...',
-          'Analitzant respostes...',
-          'Verificant ports...',
-          'Escrivint resultats temporals...',
-        ];
-        const randomMsg = heartbeats[Math.floor(Math.random() * heartbeats.length)];
-        this.scanLogs.update((l) => {
-          const newLogs = [...l, { msg: randomMsg, type: 'dim' }];
-          return newLogs.slice(-5);
-        });
-      }
-    }, 1000);
+    // Simulació de finalització (Només per demo)
+    // setTimeout(() => {
+    //   this.finishScanInBackground(newScanId);
+    // }, 12000);
   }
 
   completeScanSimulation(durationMs: number) {
@@ -145,10 +138,43 @@ export class Scan {
     this.activeTab.set('results');
   }
 
+  finishScanInBackground(scanId: number) {
+    // Simula el backend acabant
+    this.scanHistory.update((history) => {
+      return history.map((item) => {
+        if (item.id === scanId) {
+          const isClean = Math.random() > 0.5;
+          return {
+            ...item,
+            status: isClean ? 'Net' : 'Advertència',
+            findings: isClean ? 0 : Math.floor(Math.random() * 5) + 1,
+            duration: '14m 20s',
+          };
+        }
+        return item;
+      });
+    });
+  }
+
   stopScan() {
     if (this.scanInterval) clearInterval(this.scanInterval);
     this.isScanning.set(false);
     this.scanLogs.set([]);
     this.elapsedTime.set('00:00');
+  }
+
+  resetScan() {
+    this.isScanning.set(false);
+    this.targetUrl.set('');
+    if (this.messageInterval) clearInterval(this.messageInterval);
+  }
+
+  startFunnyMessages() {
+    // Canviar missatge cada 3 segons
+    this.currentFunnyMessage.set(this.funnyMessages[0]);
+    this.messageInterval = setInterval(() => {
+      const idx = Math.floor(Math.random() * this.funnyMessages.length);
+      this.currentFunnyMessage.set(this.funnyMessages[idx]);
+    }, 3000);
   }
 }
