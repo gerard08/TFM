@@ -21,8 +21,7 @@ namespace Worker.Helpers
             var stdOutBuilder = new StringBuilder();
             var stdErrBuilder = new StringBuilder();
 
-            try
-            {
+            
                 using var process = new Process { StartInfo = processStartInfo };
 
                 // --- OPTIMITZACIÓ DE MEMÒRIA ---
@@ -54,15 +53,9 @@ namespace Worker.Helpers
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                try
-                {
+             
                     await process.WaitForExitAsync(cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    if (!process.HasExited) process.Kill(entireProcessTree: true);
-                    return "CANCELLED";
-                }
+                
 
                 process.WaitForExit(); // Assegurar que els buffers estan buits
 
@@ -85,11 +78,7 @@ namespace Worker.Helpers
 
                 // Si no tenim fitxer, retornem el que hem capturat a la RAM (Nmap)
                 return stdOutBuilder.ToString();
-            }
-            catch (Exception ex)
-            {
-                return $"ERROR: Exception while executing '{command}': {ex.Message}";
-            }
+
         }
     }
 }

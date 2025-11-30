@@ -73,7 +73,7 @@ public class QueueService: IQueueService
 
     private async Task PublishScanFinishedAsync()
     {
-        var json = JsonSerializer.Serialize("completed");
+       var json = JsonSerializer.Serialize("success");
         var body = Encoding.UTF8.GetBytes(json);
 
         var props = new BasicProperties(); // En versions noves potser has de fer servir _channel.CreateBasicProperties()
@@ -93,47 +93,31 @@ public class QueueService: IQueueService
 
                 try
                 {
-                    //var findings = await ScanOperations.RunScanAsync(scanRequest, cancellationToken);
+                    var findings = await ScanOperations.RunScanAsync(scanRequest, cancellationToken);
 
-                    //var options = new ParallelOptions { MaxDegreeOfParallelism = 5 };
+                    var options = new ParallelOptions { MaxDegreeOfParallelism = 5 };
 
-                    //var descriptionByAi = scanRequest.ScanType > ScanTypeEnum.Services;
-                    //await Parallel.ForEachAsync(findings, options, async (finding, token) =>
-                    //{
-                    //    finding.Solution = await _localAiService.FindSolutionWithAi(finding);
-                    //    if (descriptionByAi && finding.Description != string.Empty)
-                    //    {
-                    //        finding.Description = await _localAiService.WriteDescriptionWithAi(finding);
-                    //    }
-                    //});
-                    //var scanResults = await dbOperations.SaveResultsToDb(scanRequest, scanTaskGuid, findings);
+                    var descriptionByAi = scanRequest.ScanType > ScanTypeEnum.Services;
+                    await Parallel.ForEachAsync(findings, options, async (finding, token) =>
+                    {
+                        finding.Solution = await _localAiService.FindSolutionWithAi(finding);
+                        if (descriptionByAi && finding.Description != string.Empty)
+                        {
+                            finding.Description = await _localAiService.WriteDescriptionWithAi(finding);
+                        }
+                    });
+                    var scanResults = await dbOperations.SaveResultsToDb(scanRequest, scanTaskGuid, findings);
                     Console.WriteLine("ENTER");
                     await Task.Delay(5000);
-                    var scanResults = new ScanResults()
-                    {
-                        Id = Guid.NewGuid(),
-                        Scan_task_id = scanTaskGuid,
-                        Summary = $"TEST TEST TEST.",
-                        Created_at = DateTime.UtcNow,
-                        Findings = null!
-                    };
                     Console.WriteLine("SENDING");
-                    await PublishScanFinishedAsync(scanResults);
+                    await PublishScanFinishedAsync();
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine(e.Message);
                     await MarkTaskAsFailed(scanTaskGuid);
 
-                    var scanResults = new ScanResults()
-                    {
-                        Id = Guid.NewGuid(),
-                        Scan_task_id = scanTaskGuid,
-                        Summary = $"Failed scan, please review the provided arguments and try again.",
-                        Created_at = DateTime.UtcNow,
-                        Findings = null!
-                    };
-                    await PublishScanFinishedAsync(scanResults);
+                    await PublishScanFinishedAsync();
                 }
             }
         }

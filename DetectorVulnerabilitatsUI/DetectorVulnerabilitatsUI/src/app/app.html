@@ -37,7 +37,7 @@
               </div>
             </div>
             <!-- STATS ACCEDIT COM A SIGNAL -->
-            <div class="text-3xl font-bold text-white mb-1">{{ stats().scansTotal }}</div>
+            <div class="text-3xl font-bold text-white mb-1">{{ scanHistory().length }}</div>
             <div class="text-sm text-slate-500">Escanejos Totals</div>
           </div>
 
@@ -68,7 +68,7 @@
               </div>
               <span class="animate-pulse w-2 h-2 bg-red-500 rounded-full"></span>
             </div>
-            <div class="text-3xl font-bold text-white mb-1">{{ stats().vulnsHigh }}</div>
+            <div class="text-3xl font-bold text-white mb-1">{{ criticalScans().length }}</div>
             <div class="text-sm text-slate-500">Crítiques (Últim)</div>
           </div>
 
@@ -97,7 +97,7 @@
                 </svg>
               </div>
             </div>
-            <div class="text-3xl font-bold text-white mb-1">{{ stats().uniqueTargets }}</div>
+            <div class="text-3xl font-bold text-white mb-1">{{ differentAssets().length }}</div>
             <div class="text-sm text-slate-500">Objectius Únics</div>
           </div>
 
@@ -138,6 +138,7 @@
             <thead class="bg-slate-950/50 text-slate-500 uppercase text-xs">
               <tr>
                 <th class="px-6 py-4 font-medium">Objectiu</th>
+                <th class="px-6 py-4 font-medium">Tipus Escaneig</th>
                 <th class="px-6 py-4 font-medium">Data</th>
                 <th class="px-6 py-4 font-medium">Durada</th>
                 <th class="px-6 py-4 font-medium">Estat</th>
@@ -146,17 +147,18 @@
             </thead>
             <tbody class="divide-y divide-slate-800">
               <!-- LOGS ACCEDIT COM A SIGNAL -->
-              @for (log of logs(); track log.id) {
+              @for (log of scanHistory().slice(0, 5); track log.id) {
               <tr class="hover:bg-slate-800/50 transition-colors">
                 <td class="px-6 py-4 font-mono text-slate-300">{{ log.target }}</td>
+                <td class="px-6 py-4 font-mono text-slate-300">{{ log.scanType }}</td>
                 <td class="px-6 py-4 text-slate-400">{{ log.date }}</td>
                 <td class="px-6 py-4 text-slate-400">{{ log.duration }}</td>
                 <td class="px-6 py-4">
                   <span
                     class="px-2.5 py-0.5 rounded-full text-xs font-medium border"
-                    [class]="getStatusClass(log.status)"
+                    [class]="getStatusClass(log.state)"
                   >
-                    {{ log.status }}
+                    {{ log.state }}
                   </span>
                 </td>
                 <td class="px-6 py-4">

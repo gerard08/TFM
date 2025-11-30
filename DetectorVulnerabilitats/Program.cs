@@ -14,6 +14,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<IQueueService, QueueService>();
 builder.Services.AddHostedService<ScanUpdateListener>();
+builder.Services.AddScoped<ResultsReaderService>();
 builder.Services.AddSignalR();
 
 builder.Services.AddDbContext<DetectorVulnerabilitatsDatabaseContext>(options =>

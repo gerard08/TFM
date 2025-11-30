@@ -1,4 +1,5 @@
 using DetectorVulnerabilitats.Models;
+using DetectorVulnerabilitats.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DetectorVulnerabilitats.Controllers
@@ -8,20 +9,17 @@ namespace DetectorVulnerabilitats.Controllers
     {
         private readonly ILogger<ScansController> _logger;
         private readonly IQueueService _queue;
+        private readonly ResultsReaderService _resultsReaderService;
 
 
         public ScansController(
             ILogger<ScansController> logger,
-            IQueueService queue)
+            IQueueService queue,
+            ResultsReaderService resultsReaderService)
         {
             _logger = logger;
             _queue = queue;
-        }
-
-        [HttpGet("try")]
-        public string StartScan()
-        {
-            return "okay";
+            _resultsReaderService = resultsReaderService;
         }
 
         [HttpPost("requestscan")]
@@ -31,6 +29,15 @@ namespace DetectorVulnerabilitats.Controllers
             _logger.LogInformation($"SCAN REQUESTED WITH TARGET {request.Target} AND SCAN TYPE {request.ScanType}");
             await _queue.EnqueueScanAsync(request);
             return Ok(new { status = "queued", target = request.Target });
+        }
+
+        [HttpGet("scanresults")]
+        public async Task<IActionResult> GetScanResultsAsync()
+        {
+            Console.WriteLine($"RESULTS REQUESTED");
+            _logger.LogInformation($"RESULTS REQUESTED");
+            var scanResults = await _resultsReaderService.GetAllScanResultsAsync();
+            return Ok(scanResults);
         }
     }
 }

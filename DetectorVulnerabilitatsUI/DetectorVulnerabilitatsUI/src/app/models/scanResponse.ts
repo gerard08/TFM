@@ -1,7 +1,9 @@
 export interface ScanResponse {
-  State: string;
-  Target: string;
-  Date: string;
-  VulnerabilityCount: string;
-  Duration: string;
+  id: string;
+  scanType: string;
+  state: string;
+  target: string;
+  date: string;
+  vulnerabilityCount: string;
+  duration: string;
 }

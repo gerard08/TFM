@@ -1,9 +1,18 @@
-import { Component, signal, effect, ViewChild, ElementRef, WritableSignal } from '@angular/core';
+import { ScanResponse } from './models/scanResponse';
+import {
+  Component,
+  signal,
+  effect,
+  ViewChild,
+  ElementRef,
+  WritableSignal,
+  computed,
+} from '@angular/core';
 import { INITIAL_STATS, INITIAL_LOGS, INITIAL_HISTORY } from './helpers/mockData';
 import { ScanCompletedEvent, SignalrService } from './services/signalr.service';
 import { ToastrService } from 'ngx-toastr';
 import { Subscription } from 'rxjs';
-import { Results } from './components/results/results';
+import { ScanService } from './services/scan-service/scan.service';
 
 @Component({
   selector: 'app-root',
@@ -19,13 +28,24 @@ export class App {
   // Aquests senyals es carreguen de localStorage si existeix, sino usen els valors inicials
   stats = signal(this.loadData('vuln_stats', INITIAL_STATS));
   logs = signal(this.loadData('vuln_logs', INITIAL_LOGS));
-  scanHistory = signal(this.loadData('vuln_history', INITIAL_HISTORY));
+  scanHistory = signal<ScanResponse[]>([]);
+  criticalScans = computed(() => this.scanHistory().filter((x) => x.state === 'CRITICAL'));
+  differentAssets = computed(() => {
+    const targetsOnly = this.scanHistory()
+      .map((x) => x.target)
+      .filter((t) => t != null && t !== '');
+    return [...new Set(targetsOnly)];
+  });
 
   private signalRSubscription!: Subscription;
 
   @ViewChild('logsContainer') logsContainer!: ElementRef;
 
-  constructor(private signalrService: SignalrService, private toastr: ToastrService) {
+  constructor(
+    private signalrService: SignalrService,
+    private toastr: ToastrService,
+    private scanService: ScanService
+  ) {
     // 1. Auto-scroll logs
     effect(() => {
       const logs = this.scanLogs();
@@ -48,15 +68,22 @@ export class App {
     this.loadScans();
     this.signalRSubscription = this.signalrService.scanFinished$.subscribe(
       (event: ScanCompletedEvent) => {
-        this.toastr.success(`REBUT AMB SUMMARY ${event.Summary}`);
+        this.toastr.success(`REBUT`);
         this.loadScans();
       }
     );
   }
 
-  loadScans()
-  {
-
+  loadScans() {
+    this.scanService.getResults().subscribe({
+      next: (response) => {
+        console.log('Èxit! Resposta del servidor:', response);
+        this.scanHistory.set(response);
+      },
+      error: (error) => {
+        console.error('Error enviant scan:', error);
+      },
+    });
   }
 
   // --- Mètodes de Persistència ---
@@ -72,7 +99,7 @@ export class App {
     // Reset a valors inicials
     this.stats.set(INITIAL_STATS);
     this.logs.set(INITIAL_LOGS);
-    this.scanHistory.set(INITIAL_HISTORY);
+    this.scanHistory.set(null!);
     alert('Dades esborrades correctament.');
   }
 
