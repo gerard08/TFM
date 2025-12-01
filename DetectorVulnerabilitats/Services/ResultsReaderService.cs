@@ -13,6 +13,17 @@ namespace DetectorVulnerabilitats.Services
             _dbcontext = dbContext;
         }
 
+        public async Task<ScanResults> GetScanResultById(Guid id)
+        {
+            var scanResult = await _dbcontext.ScanResults.Include(x => x.ScanTask)
+                        .ThenInclude(t => t.Asset)
+                    .Include(x => x.Findings)
+                    .Where(x => x.Id.Equals(id))
+                    .ToListAsync();
+
+            return scanResult.SingleOrDefault();
+        }
+
         public async Task<List<ScanResponse>> GetAllScanResultsAsync()
         {
             var result = new List<ScanResponse>();
@@ -72,6 +83,7 @@ namespace DetectorVulnerabilitats.Services
 
                 return new ScanResponse()
                 {
+                    Id = scanResult.Id,
                     State = resultStat,
                     ScanType = scanResult.ScanTask.Scan_type,
                     Target = scanResult.ScanTask.Asset.Ip,

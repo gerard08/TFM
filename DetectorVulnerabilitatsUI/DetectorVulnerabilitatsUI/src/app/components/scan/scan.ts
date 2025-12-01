@@ -1,9 +1,10 @@
 import { ScanRequest } from './../../models/scanrequest';
 import { Component, model, signal } from '@angular/core';
 import { SCAN_TYPES } from '../../models/scan-types';
-import { FUNNY_MESSAGES } from '../../models/missatgesDivertits';
+import { SCAN_MESSAGES } from '../../models/missatgesDivertits';
 import { ScanService } from '../../services/scan-service/scan.service';
 import { tipusEscaneig } from '../../models/tipusEscaneig';
+import { ToastrService } from 'ngx-toastr';
 
 @Component({
   selector: 'app-scan',
@@ -16,36 +17,19 @@ export class Scan {
 
   activeTab = model.required<'dashboard' | 'scan' | 'results' | 'settings'>();
   scanHistory = model.required<any[]>();
-  scanLogs = model.required<any[]>();
-  logs = model.required<any[]>();
-  funnyMessages = FUNNY_MESSAGES;
+
+  funnyMessages = SCAN_MESSAGES;
+
   currentFunnyMessage = signal<string>(this.funnyMessages[0]);
-
-  stats = model.required<{
-    scansTotal: number;
-    vulnsHigh: number;
-    uniqueTargets: number;
-    lastScan: string;
-    status: string;
-  }>();
-
   targetUrl = signal<string>('');
   selectedScan = signal<tipusEscaneig>(SCAN_TYPES[0]);
   isScanning = signal<boolean>(false);
   scanProgress = signal<number>(0);
   elapsedTime = signal<string>('00:00');
 
-  private scanInterval: any;
-  private startTime: number = 0;
   private messageInterval: any;
 
-  private scanService:ScanService;
-
-
-  constructor()
-  {
-    this.scanService = new ScanService();
-  }
+  constructor(private toastr: ToastrService, private scanService: ScanService) {}
 
   getScanTypeClass(typeId: number) {
     return this.selectedScan().id === typeId
@@ -68,19 +52,20 @@ export class Scan {
 
     var scan = {
       Target: this.targetUrl(),
-      ScanType: this.selectedScan().id
+      ScanType: this.selectedScan().id,
     } as ScanRequest;
-
-console.log(scan);
 
     this.scanService.startScan(scan).subscribe({
       next: (response) => {
         console.log('Èxit! Resposta del servidor:', response);
+        this.toastr.success(`Escaneig enviat al servidor correctament`);
       },
       error: (error) => {
         console.error('Error enviant scan:', error);
-      }
+        this.toastr.error(`Error en processar l'escaneig`);
+      },
     });
+
     // Iniciar rotació de missatges graciosos
     this.startFunnyMessages();
   }

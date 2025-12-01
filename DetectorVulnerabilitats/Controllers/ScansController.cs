@@ -31,13 +31,28 @@ namespace DetectorVulnerabilitats.Controllers
             return Ok(new { status = "queued", target = request.Target });
         }
 
-        [HttpGet("scanresults")]
+        [HttpGet("allscanresults")]
         public async Task<IActionResult> GetScanResultsAsync()
         {
             Console.WriteLine($"RESULTS REQUESTED");
             _logger.LogInformation($"RESULTS REQUESTED");
             var scanResults = await _resultsReaderService.GetAllScanResultsAsync();
             return Ok(scanResults);
+        }
+
+        [HttpGet("scanresult/{id}")]
+        public async Task<IActionResult> GetScanResultsAsync(Guid id)
+        {
+            Console.WriteLine($"RESULTS REQUESTED");
+            _logger.LogInformation($"RESULTS REQUESTED");
+            var scanResults = await _resultsReaderService.GetScanResultById(id);
+
+            if(scanResults is not null)
+            {
+                return Ok(scanResults);
+            }
+            return NotFound($"Scan with request id {id} was not found in the server.");
+
         }
     }
 }

@@ -21,9 +21,9 @@ namespace Worker.Models
     public enum ScanTypeEnum
     {
         Services = 0,
-        WebEnumeration = 1,
-        WebVuln = 2,
-        CmsScan = 3,
+        Infrastructure = 1,
+        WebEnumeration = 2,
+        WebVuln = 3,
         DDBB = 4
     }
 }

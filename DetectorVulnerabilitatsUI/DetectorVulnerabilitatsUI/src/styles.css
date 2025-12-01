@@ -1,12 +1,26 @@
-/* You can add global styles to this file, and also import other style files */
-/* Afegeix aquestes tres línies al principi del teu fitxer CSS global */
-@import 'ngx-toastr/toastr';
+/* ELIMINA LA LÍNIA DEL IMPORT D'AQUÍ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ... altres estils globals si en tens ... */
-html, body {
-    height: 100%;
-    margin: 0;
+/* Estils globals */
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+/* Scrollbar personalitzat */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }

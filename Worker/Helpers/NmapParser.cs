@@ -1,11 +1,49 @@
 ﻿using DetectorVulnerabilitatsDatabase.Models;
-using System.Globalization; // Necessari per parsejar decimals amb punts
 using System.Xml.Linq;
+using Worker.Models;
 
 namespace Worker.Helpers
 {
     public static class NmapParser
     {
+
+        public static List<NetworkService> ParseNmapXmlToServices(string xmlContent)
+        {
+            var services = new List<NetworkService>();
+
+            try
+            {
+                var doc = XDocument.Parse(xmlContent);
+
+                // Busquem tots els elements <port>
+                var ports = doc.Descendants("port");
+
+                foreach (var port in ports)
+                {
+                    // Només ens interessen els ports que estan "open"
+                    var state = port.Element("state")?.Attribute("state")?.Value;
+                    if (state != "open") continue;
+
+                    int portId = int.Parse(port.Attribute("portid")?.Value ?? "0");
+                    string protocol = port.Attribute("protocol")?.Value ?? "tcp";
+
+                    // Extraiem la info del servei (nmap -sV)
+                    var serviceElement = port.Element("service");
+                    string serviceName = serviceElement?.Attribute("name")?.Value ?? "unknown";
+                    string product = serviceElement?.Attribute("product")?.Value ?? "";
+                    string version = serviceElement?.Attribute("version")?.Value ?? "";
+
+                    services.Add(new NetworkService(portId, protocol, serviceName, product, version));
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Error Parsing Nmap XML]: {ex.Message}");
+                // En cas d'error, retornem llista buida o parcial
+            }
+
+            return services;
+        }
 
         public static List<int> ParseNmapXmlPorts(string xmlContent)
         {

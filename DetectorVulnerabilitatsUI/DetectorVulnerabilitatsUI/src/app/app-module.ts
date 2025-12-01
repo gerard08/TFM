@@ -8,13 +8,17 @@ import { Sidebar } from './components/sidebar/sidebar';
 import { Scan } from './components/scan/scan';
 import { Results } from './components/results/results';
 import { provideHttpClient } from '@angular/common/http';
+import { Dashboard } from './components/dashboard/dashboard';
+import { Report } from './components/report/report';
 
 @NgModule({
   declarations: [
     App,
     Sidebar,
     Scan,
-    Results
+    Results,
+    Dashboard,
+    Report
   ],
   imports: [
     BrowserModule,

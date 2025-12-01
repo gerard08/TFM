@@ -13,7 +13,7 @@ namespace Worker.Operations
             {
                 throw new InvalidOperationException("The host is down");
             }
-            var targetsFile = await CreateTargetFilesAsync(request.Target, openPorts);
+            var targetsFile = await CreateTargetFilesAsync(request.Target, openPorts, request.ScanType);
 
             var resultsFile = Path.GetTempFileName();
 
@@ -21,10 +21,10 @@ namespace Worker.Operations
             var (command, arguments) = request.ScanType switch
             {
                 ScanTypeEnum.Services => ("nmap", $"-sV --version-intensity 9 -p {string.Join(",", openPorts)} --script vulners -oX - {request.Target}"),
-                ScanTypeEnum.WebEnumeration => ("nuclei", $" -l {targetsFile} -tags ech,config,exposure,misconfiguration,panel,token -j -timeout 2 -retries 0 -c 10 -bs 25 -ni -disable-update-check -nc -silent -o {resultsFile}"),
-                ScanTypeEnum.WebVuln => ("nuclei", $" -l {targetsFile} -tags cve,critical,high,medium,vulnerability,default-login,sqli,xss,lfi,rce -j -timeout 2 -retries 0 -c 10 -bs 25 -ni -disable-update-check -nc -silent -o {resultsFile}"),
-                ScanTypeEnum.CmsScan => ("nuclei", $" -l {targetsFile} -tags tech,exposure,panel,misconfiguration,token,wordpress,wp-plugin -j -timeout 3 -retries 0 -c 15 -bs 5 -rl 50 -ni -disable-update-check -o {resultsFile}"),
-                ScanTypeEnum.DDBB => ("nmap", $"-sV -p {string.Join(",", openPorts)} --script \"mysql-empty-password,mysql-vuln*,ms-sql-empty-password,ms-sql-info,mongodb-info,redis-info\" -oX - {request.Target}"),
+                ScanTypeEnum.Infrastructure => ("nuclei", $" -l {targetsFile} -tags network,db,redis,memcached,misconfig -timeout 5 -retries 2 -c 15 -ni -nc -silent -o {resultsFile}"),
+                ScanTypeEnum.WebEnumeration => ("nuclei", $" -l {targetsFile} -tags tech,exposed-panels,login,token,exposure -timeout 5 -retries 1 -c 15 -ni -nc -silent -o {resultsFile}"),
+                ScanTypeEnum.WebVuln => ("nuclei", $" -l {targetsFile} -tags cve,critical,high,medium,rce,sqli,xss,lfi -timeout 8 -retries 1 -c 10 -bs 10 -ni -nc -silent -o {resultsFile}"),
+                ScanTypeEnum.DDBB => ("nuclei", $" -l {targetsFile} -tags mysql,mariadb,db,credential -timeout 5 -retries 1 -c 10 -ni -nc -silent -o {resultsFile}"),
                 _ => throw new InvalidOperationException($"Tipus d'escaneig desconegut: {request.ScanType}")
             };
 
@@ -33,47 +33,72 @@ namespace Worker.Operations
             var findings = request.ScanType switch
             {
                 ScanTypeEnum.Services => await NmapParser.ParseServicesToFindingsAsync(rawResult),
+                ScanTypeEnum.Infrastructure => NucleiParser.Parse(rawResult),
                 ScanTypeEnum.WebEnumeration => NucleiParser.Parse(rawResult),
                 ScanTypeEnum.WebVuln => NucleiParser.Parse(rawResult),
-                ScanTypeEnum.CmsScan => NucleiParser.Parse(rawResult),
-                ScanTypeEnum.DDBB => await NmapParser.ParseServicesToFindingsAsync(rawResult),
+                ScanTypeEnum.DDBB => NucleiParser.Parse(rawResult),
                 _ => throw new InvalidOperationException($"Tipus d'escaneig desconegut: {request.ScanType}")
             };
 
             File.Delete(targetsFile);
+            File.Delete(resultsFile);
             return findings;
         }
 
-        private static async Task<string> CreateTargetFilesAsync(string host, List<int> openPorts)
+        private static async Task<string> CreateTargetFilesAsync(string host, List<NetworkService> services, ScanTypeEnum scanType)
         {
             var filePath = Path.GetTempFileName();
             var lines = new List<string>();
 
-            var nonWebPorts = new HashSet<int>
+            foreach (var service in services)
             {
-                21, 22, 23, 25, 53,         // Infra (FTP, SSH, Telnet, SMTP, DNS)
-                3306, 5432, 1433, 27017,    // Bases de Dades (MySQL, Postgres, SQLServer, Mongo)
-                6379, 11211,                // Cache (Redis, Memcached)
-                5672                        // RabbitMQ (AMQP) - Nota: El 15672 SÍ que és web
-            };
+                // Normalitzem el nom a minúscules per comparar fàcilment
+                string sName = service.ServiceName.ToLower();
+                string product = service.Product?.ToLower() ?? "";
 
-            foreach (var port in openPorts)
-            {
-                if (nonWebPorts.Contains(port))
+                // Lògica intel·ligent basada en el NOM del servei
+                bool isWeb = sName.Contains("http") || sName.Contains("https") || sName.Contains("ssl") || product.Contains("apache") || product.Contains("nginx");
+                bool isDatabase = sName.Contains("sql") || sName.Contains("redis") || sName.Contains("mongo") || sName.Contains("oracle") || sName.Contains("maria");
+
+                switch (scanType)
                 {
-                    continue;
+                    case ScanTypeEnum.WebEnumeration:
+                    case ScanTypeEnum.WebVuln:
+                        // Només afegim si Nmap diu que és HTTP/HTTPS, estigui al port que estigui
+                        if (isWeb)
+                        {
+                            string prefix = sName.Contains("ssl") || sName.Contains("https") ? "https://" : "http://";
+                            lines.Add($"{prefix}{host}:{service.Port}");
+                        }
+                        break;
+
+                    case ScanTypeEnum.DDBB:
+                        // Només afegim si Nmap diu que és una Base de Dades
+                        if (isDatabase)
+                        {
+                            lines.Add($"{host}:{service.Port}");
+                        }
+                        break;
+
+                    case ScanTypeEnum.Infrastructure:
+                        // Infrastructure mira DBs, FTP, SSH, etc. Excloem web per no duplicar feina
+                        if (!isWeb)
+                        {
+                            lines.Add($"{host}:{service.Port}");
+                        }
+                        break;
                 }
-                lines.Add($"{host}:{port}");
             }
 
+            // Si no trobem res per aquell tipus, deixem el fitxer buit (Nuclei acabarà ràpid)
             await File.WriteAllLinesAsync(filePath, lines);
             return filePath;
         }
 
-        private static async Task<List<int>> DiscoverOpenPortsAsync(ScanRequest request, CancellationToken cancellationToken)
+        private static async Task<List<NetworkService>> DiscoverOpenPortsAsync(ScanRequest request, CancellationToken cancellationToken)
         {
             const string command = "nmap";
-            var arguments = $"-p- -sS -n -T4 --min-rate 2000 --max-retries 2 -oX - {request.Target}";
+            var arguments = $"-p- -sS -n -T4 --max-retries 3 -Pn --open -oX - {request.Target}";
             var rawResult = await SystemOperations.ExecuteCommandAsync(command, arguments, cancellationToken);
 
             if (string.IsNullOrWhiteSpace(rawResult)) return new();
@@ -84,7 +109,7 @@ namespace Worker.Operations
                 return new();
             }
 
-            return NmapParser.ParseNmapXmlPorts(rawResult);
+            return NmapParser.ParseNmapXmlToServices(rawResult);
         }
     }
 }

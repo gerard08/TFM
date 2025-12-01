@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ScanRequest } from '../../models/scanrequest';
 import { ScanResponse } from '../../models/scanResponse';
+import { ScanResults } from '../../models/db_models/scanresults';
 
 @Injectable({
   providedIn: 'root'
@@ -18,6 +19,12 @@ export class ScanService {
   }
 
   getResults(): Observable<ScanResponse[]> {
-    return this.http.get<ScanResponse[]>(`${this.apiUrl}/scanresults`);
+    return this.http.get<ScanResponse[]>(`${this.apiUrl}/allscanresults`);
+  }
+
+  getResult(id: string): Observable<ScanResults> {
+    let result =  this.http.get<ScanResults>(`${this.apiUrl}/scanresult/${id}`);
+    console.log(result);
+    return result;
   }
 }
